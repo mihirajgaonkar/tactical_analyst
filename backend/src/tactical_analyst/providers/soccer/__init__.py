@@ -1,0 +1,1 @@
+"""Soccer data provider adapters."""

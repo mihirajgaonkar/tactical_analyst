@@ -1,0 +1,12 @@
+[
+  {"match_id": "eval-001", "provider": "statsbomb_open", "review_status": "planned"},
+  {"match_id": "eval-002", "provider": "statsbomb_open", "review_status": "planned"},
+  {"match_id": "eval-003", "provider": "statsbomb_open", "review_status": "planned"},
+  {"match_id": "eval-004", "provider": "statsbomb_open", "review_status": "planned"},
+  {"match_id": "eval-005", "provider": "statsbomb_open", "review_status": "planned"},
+  {"match_id": "eval-006", "provider": "statsbomb_open", "review_status": "planned"},
+  {"match_id": "eval-007", "provider": "statsbomb_open", "review_status": "planned"},
+  {"match_id": "eval-008", "provider": "statsbomb_open", "review_status": "planned"},
+  {"match_id": "eval-009", "provider": "statsbomb_open", "review_status": "planned"},
+  {"match_id": "eval-010", "provider": "statsbomb_open", "review_status": "planned"}
+]
