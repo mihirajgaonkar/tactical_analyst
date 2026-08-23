@@ -22,6 +22,33 @@ def test_normalize_statsbomb_lineups() -> None:
     assert len(lineups) == 2
     assert lineups[0].starter is True
     assert lineups[0].position == "Right Center Midfield"
+
+
+def test_normalize_statsbomb_lineups_accepts_string_position() -> None:
+    raw_lineups = [
+        {
+            "team_id": 1,
+            "lineup": [
+                {
+                    "player_id": 10,
+                    "player_name": "Test Player",
+                    "jersey_number": 8,
+                    "positions": [
+                        {
+                            "position_id": 13,
+                            "position": "Right Center Midfield",
+                            "from": "00:00",
+                            "start_reason": "Starting XI",
+                        }
+                    ],
+                }
+            ],
+        }
+    ]
+
+    lineups = normalize_statsbomb_lineups("statsbomb:1", raw_lineups)
+
+    assert lineups[0].position == "Right Center Midfield"
     assert lineups[0].shirt_number == 8
 
 

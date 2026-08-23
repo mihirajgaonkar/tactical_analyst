@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine, event, select
 from sqlalchemy.orm import Session
 
 from tactical_analyst.db.models import Base, LineupModel, MatchEventModel, MatchModel
@@ -36,6 +36,13 @@ class FakeStorage:
 
 async def test_ingestion_service_is_idempotent() -> None:
     engine = create_engine("sqlite:///:memory:")
+
+    @event.listens_for(engine, "connect")
+    def enable_sqlite_foreign_keys(dbapi_connection, _connection_record) -> None:
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
+
     Base.metadata.create_all(engine)
 
     with Session(engine) as session:

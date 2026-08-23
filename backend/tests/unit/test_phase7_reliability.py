@@ -17,7 +17,7 @@ from tactical_analyst.llm.schemas import TacticalInterpretation
 from tactical_analyst.llm.service import LLMService
 from tactical_analyst.reliability.logging import log_analysis_event
 from tactical_analyst.reliability.retry import RetryConfig, retry_call
-from tactical_analyst.workers.jobs import LocalJobClient
+from tactical_analyst.workers.jobs import CeleryJobClient, LocalJobClient
 
 
 def test_cache_keys_and_payload_hash_are_stable() -> None:
@@ -58,6 +58,16 @@ def test_local_job_client_uses_idempotency_key() -> None:
     assert first.job_id == second.job_id
 
 
+def test_celery_job_client_does_not_forward_idempotency_metadata() -> None:
+    celery_app = RecordingCeleryApp()
+    client = CeleryJobClient(celery_app)
+
+    queued = client.enqueue("task", "match:1", idempotency_key="analysis:match:1")
+
+    assert queued.job_id == "job:1"
+    assert celery_app.sent == ("task", ("match:1",), {})
+
+
 def test_llm_service_retries_structured_output_calls() -> None:
     model = FlakyStructuredModel()
     service = LLMService(FlakyChatModel(model), RetryConfig(max_attempts=2, backoff_seconds=0))
@@ -66,6 +76,51 @@ def test_llm_service_retries_structured_output_calls() -> None:
 
     assert result.match_summary == "Recovered"
     assert model.calls == 2
+
+
+def test_llm_service_compacts_raw_event_ids_in_prompt() -> None:
+    model = CapturingStructuredModel()
+    service = LLMService(FlakyChatModel(model))
+    packet = _evidence_packet()
+    packet.metrics[0].source_event_ids = ["event:1", "event:2"]
+
+    service.interpret(packet)
+
+    assert '"source_event_count": 2' in model.prompt
+    assert "event:1" not in model.prompt
+
+
+def test_llm_service_keeps_only_shot_possessions_in_prompt() -> None:
+    from tactical_analyst.schemas.evidence import EvidenceMetric
+
+    model = CapturingStructuredModel()
+    service = LLMService(FlakyChatModel(model))
+    packet = _evidence_packet()
+    packet.metrics.extend(
+        [
+            EvidenceMetric(
+                evidence_id="ROUTINE_POSSESSION",
+                metric="possession_sequences",
+                entity_type="possession",
+                entity_id="1",
+                value={"shot": False},
+                definition_version="v1",
+            ),
+            EvidenceMetric(
+                evidence_id="SHOT_POSSESSION",
+                metric="possession_sequences",
+                entity_type="possession",
+                entity_id="2",
+                value={"shot": True},
+                definition_version="v1",
+            ),
+        ]
+    )
+
+    service.interpret(packet)
+
+    assert "SHOT_POSSESSION" in model.prompt
+    assert "ROUTINE_POSSESSION" not in model.prompt
 
 
 def test_duplicate_report_lookup_by_evidence_hash() -> None:
@@ -135,6 +190,24 @@ class FlakyChatModel:
 
     def with_structured_output(self, schema):
         return self.model
+
+
+class CapturingStructuredModel:
+    def __init__(self) -> None:
+        self.prompt = ""
+
+    def invoke(self, prompt: str) -> TacticalInterpretation:
+        self.prompt = prompt
+        return TacticalInterpretation(match_summary="Captured", claims=[])
+
+
+class RecordingCeleryApp:
+    def __init__(self) -> None:
+        self.sent = None
+
+    def send_task(self, task_name, *, args, kwargs):
+        self.sent = (task_name, args, kwargs)
+        return type("Result", (), {"id": "job:1"})()
 
 
 def _evidence_packet():

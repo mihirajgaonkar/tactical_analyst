@@ -68,6 +68,10 @@ def test_phase5_api_routes() -> None:
     assert client.get("/reports/report:1/evidence").json()["metrics"][0]["evidence_id"] == "E1"
     claim_evidence = client.get("/reports/report:1/claims/claim:1/evidence").json()
     assert claim_evidence["evidence"][0]["evidence_id"] == "E1"
+    latest_report = client.get("/matches/match:1/report").json()
+    assert latest_report["id"] == "report:1"
+    assert latest_report["claims"][0]["id"] == "claim:1"
+    assert client.get("/matches/missing/report").status_code == 404
 
 
 def _seed(session: Session) -> None:

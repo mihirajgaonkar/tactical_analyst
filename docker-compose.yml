@@ -46,7 +46,7 @@ services:
     build:
       context: ./backend
     env_file:
-      - .env.example
+      - .env
     environment:
       DATABASE_URL: postgresql+psycopg://postgres:postgres@postgres:5432/tactical_analyst
       REDIS_URL: redis://redis:6379/0
@@ -73,7 +73,7 @@ services:
       context: ./backend
     command: ["celery", "-A", "tactical_analyst.workers.tasks:celery_app", "worker", "--loglevel=INFO"]
     env_file:
-      - .env.example
+      - .env
     environment:
       DATABASE_URL: postgresql+psycopg://postgres:postgres@postgres:5432/tactical_analyst
       REDIS_URL: redis://redis:6379/0
@@ -99,7 +99,7 @@ services:
     ports:
       - "5173:80"
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost/"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
       interval: 10s
       timeout: 5s
       retries: 5

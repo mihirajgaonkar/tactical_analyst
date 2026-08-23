@@ -11,6 +11,8 @@ Rules:
 8. Do not mention metrics not included in the evidence packet.
 9. Distinguish territorial dominance from chance quality.
 10. Distinguish pressure activity from successful pressing outcomes.
+11. A strong claim must cite at least two distinct evidence IDs; otherwise label it moderate or weak.
+12. Use team and player names in prose, not provider or database IDs.
 
 Evidence packet:
 {evidence_packet}

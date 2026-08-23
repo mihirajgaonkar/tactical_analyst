@@ -19,6 +19,9 @@ COPY alembic ./alembic
 COPY src ./src
 COPY scripts ./scripts
 
+# Windows checkouts may give shell scripts CRLF endings, which Linux reads as `sh\r`.
+RUN sed -i 's/\r$//' scripts/*.sh && chmod +x scripts/*.sh
+
 RUN uv sync --frozen --no-dev
 
 ENV PATH="/app/.venv/bin:$PATH"

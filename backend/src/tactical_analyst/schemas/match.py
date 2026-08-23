@@ -32,7 +32,11 @@ class Match(BaseModel):
     provider: str
     provider_match_id: str
     competition_id: str
+    competition_name: str | None = None
+    competition_country: str | None = None
+    competition_gender: str | None = None
     season_id: str
+    season_name: str | None = None
     home_team: TeamRef
     away_team: TeamRef
     kickoff_at: datetime | None = None

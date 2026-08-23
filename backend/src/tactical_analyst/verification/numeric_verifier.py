@@ -7,6 +7,11 @@ from tactical_analyst.llm.schemas import FinalReport, TacticalInterpretation
 from tactical_analyst.schemas.evidence import EvidencePacket
 
 NUMBER_PATTERN = re.compile(r"(?<![A-Za-z])-?\d+(?:\.\d+)?%?")
+UUID_PATTERN = re.compile(
+    r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b"
+)
+PROVIDER_ID_PATTERN = re.compile(r"\b[A-Za-z_]+:\d+(?::\d+)*\b")
+EVIDENCE_ID_PATTERN = re.compile(r"\bMETRIC_[A-Z0-9_-]+\b")
 
 
 def verify_interpretation_numbers(
@@ -24,7 +29,11 @@ def verify_report_numbers(report: FinalReport, evidence_packet: EvidencePacket) 
 def _verify_numbers(text: str, evidence_packet: EvidencePacket) -> list[str]:
     allowed = _evidence_numbers(evidence_packet)
     errors = []
-    for raw in NUMBER_PATTERN.findall(text):
+    prose = UUID_PATTERN.sub("", text)
+    prose = PROVIDER_ID_PATTERN.sub("", prose)
+    prose = EVIDENCE_ID_PATTERN.sub("", prose)
+    prose = re.sub(r"(?<=\d)-(?=\d)", " ", prose)
+    for raw in NUMBER_PATTERN.findall(prose):
         number = raw.rstrip("%")
         try:
             decimal = Decimal(number)

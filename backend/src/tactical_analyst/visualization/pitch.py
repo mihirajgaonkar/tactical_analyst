@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import matplotlib
+
 from tactical_analyst.analytics.helpers import PITCH_LENGTH_M, PITCH_WIDTH_M
+
+matplotlib.use("Agg")
 
 
 def create_pitch(title: str | None = None, figsize: tuple[float, float] = (9, 5.8)):
@@ -18,9 +22,6 @@ def create_pitch(title: str | None = None, figsize: tuple[float, float] = (9, 5.
         )
         fig, ax = pitch.draw(figsize=figsize, constrained_layout=True, tight_layout=False)
     except ImportError:
-        import matplotlib
-
-        matplotlib.use("Agg")
         import matplotlib.pyplot as plt
 
         fig, ax = plt.subplots(figsize=figsize, constrained_layout=True)

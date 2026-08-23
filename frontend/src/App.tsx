@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Activity,
   BarChart3,
@@ -15,10 +15,13 @@ import {
   analyzeMatch,
   fetchCompetitions,
   fetchEvidence,
+  fetchMatch,
   fetchMatches,
   fetchMetrics,
   fetchReport,
-  fetchSeasons
+  fetchSeasons,
+  ingestMatch,
+  waitForJob
 } from "./api/client";
 import { MetricCard } from "./components/MetricCard";
 import { Section } from "./components/Section";
@@ -31,6 +34,7 @@ import type { EvidenceMetric, Match, Metric, ReportClaim } from "./types";
 import { findTeamMetric, metricNumber, metricValue } from "./utils/metrics";
 
 export function App() {
+  const queryClient = useQueryClient();
   const [competitionId, setCompetitionId] = useState<string | null>(null);
   const [seasonId, setSeasonId] = useState<string | null>(null);
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
@@ -54,10 +58,41 @@ export function App() {
     queryFn: () => fetchReport(selectedMatch?.id ?? null)
   });
   const evidence = useQuery({
-    queryKey: ["evidence", selectedMatch?.id],
-    queryFn: () => fetchEvidence(selectedMatch?.id ?? null)
+    queryKey: ["evidence", report.data?.id, selectedMatch?.id],
+    queryFn: () => fetchEvidence(report.data?.id ?? null, selectedMatch?.id ?? null)
   });
-  const analyze = useMutation({ mutationFn: analyzeMatch });
+  const importMatchMutation = useMutation({
+    mutationFn: async (providerMatchId: string) => {
+      const queued = await ingestMatch(providerMatchId);
+      const completed = await waitForJob(queued.job_id);
+      const result = typeof completed.result === "object" ? completed.result : null;
+      const matchId = result?.match_id;
+      if (!matchId) throw new Error("Ingestion completed without returning a match ID");
+      return fetchMatch(matchId);
+    },
+    onSuccess: async (match) => {
+      setCompetitionId(match.competition_id);
+      setSeasonId(match.season_id);
+      setSelectedMatch(match);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["competitions"] }),
+        queryClient.invalidateQueries({ queryKey: ["seasons", match.competition_id] }),
+        queryClient.invalidateQueries({ queryKey: ["matches", match.competition_id, match.season_id] })
+      ]);
+    }
+  });
+  const analyze = useMutation({
+    mutationFn: async (matchId: string) => {
+      const queued = await analyzeMatch(matchId);
+      return waitForJob(queued.job_id);
+    },
+    onSuccess: async (_job, matchId) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["metrics", matchId] }),
+        queryClient.invalidateQueries({ queryKey: ["report", matchId] })
+      ]);
+    }
+  });
 
   const homeId = selectedMatch?.home_team?.id ?? "";
   const awayId = selectedMatch?.away_team?.id ?? "";
@@ -98,9 +133,33 @@ export function App() {
             setSeasonId(id);
             setSelectedMatch(null);
           }}
-          onMatchSelect={setSelectedMatch}
+          onMatchSelect={(match) => {
+            setSelectedMatch(match);
+            setActiveClaim(null);
+            analyze.reset();
+          }}
           onAnalyze={(match) => analyze.mutate(match.id)}
-          analyzeStatus={analyze.data?.status ?? (analyze.isPending ? "queueing" : null)}
+          analyzeStatus={
+            analyze.isPending
+              ? "running"
+              : analyze.isError
+                ? "failed"
+                : analyze.isSuccess
+                  ? "completed"
+                  : null
+          }
+          analyzeError={analyze.isError ? errorMessage(analyze.error) : null}
+          importStatus={
+            importMatchMutation.isPending
+              ? "running"
+              : importMatchMutation.isSuccess
+                ? "completed"
+                : null
+          }
+          importError={
+            importMatchMutation.isError ? errorMessage(importMatchMutation.error) : null
+          }
+          onImport={(providerMatchId) => importMatchMutation.mutate(providerMatchId)}
         />
       </aside>
 
@@ -188,7 +247,7 @@ export function App() {
             <Section title="Tactical Report" icon={<FileText size={18} />} wide>
               <TacticalReportPanel
                 report={report.data}
-                loading={report.isLoading}
+                loading={report.isLoading || analyze.isPending}
                 onClaimSelect={setActiveClaim}
               />
             </Section>
@@ -249,4 +308,8 @@ function jsonNumber(metric: Metric | undefined, key: string) {
 function evidenceForClaim(claim: ReportClaim | null, evidence: EvidenceMetric[]) {
   if (!claim) return [];
   return evidence.filter((item) => claim.evidence_ids.includes(item.evidence_id));
+}
+
+function errorMessage(error: unknown) {
+  return error instanceof Error ? error.message : "Unexpected error";
 }

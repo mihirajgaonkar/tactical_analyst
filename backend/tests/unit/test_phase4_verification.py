@@ -46,6 +46,24 @@ def test_numeric_verifier_rejects_invented_number() -> None:
     assert errors == ["Unsupported numeric value: 999"]
 
 
+def test_numeric_verifier_ignores_identifiers_and_understands_score_separator() -> None:
+    packet = _packet()
+    packet.match.update({"home_score": 3, "away_score": 3})
+    report = FinalReport(
+        title="Report",
+        sections=[],
+        markdown=(
+            "Argentina (statsbomb:779) drew 3-3. "
+            "Evidence METRIC_SHOTS_TEAM_779 and event "
+            "6e81c350-5788-4f84-891a-92db9bfbf0db support the claim. "
+            "METRIC_SUBSTITUTION_IMPACT_6E81C350-5788-4F84-891A-92DB9BFBF0DB "
+            "is also an identifier."
+        ),
+    )
+
+    assert verify_report_numbers(report, packet) == []
+
+
 def test_coverage_verifier_rejects_tracking_only_language_without_tracking() -> None:
     packet = _packet()
     interpretation = TacticalInterpretation(

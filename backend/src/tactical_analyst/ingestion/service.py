@@ -88,9 +88,15 @@ class MatchIngestionService:
                     id=match.competition_id,
                     provider=match.provider,
                     provider_competition_id=match.competition_id.rsplit(":", 1)[-1],
-                    name=match.competition_id,
+                    name=match.competition_name or match.competition_id,
+                    country=match.competition_country,
+                    gender=match.competition_gender,
                 )
             )
+        else:
+            competition.name = match.competition_name or competition.name
+            competition.country = match.competition_country or competition.country
+            competition.gender = match.competition_gender or competition.gender
 
         season = self.session.get(SeasonModel, match.season_id)
         if season is None:
@@ -99,9 +105,11 @@ class MatchIngestionService:
                     id=match.season_id,
                     competition_id=match.competition_id,
                     provider_season_id=match.season_id.rsplit(":", 1)[-1],
-                    name=match.season_id,
+                    name=match.season_name or match.season_id,
                 )
             )
+        else:
+            season.name = match.season_name or season.name
 
         self._upsert_team(match.home_team.id, match.home_team.name, match.home_team.country)
         self._upsert_team(match.away_team.id, match.away_team.name, match.away_team.country)
@@ -133,9 +141,15 @@ class MatchIngestionService:
 
     def _replace_lineups(self, match_id: str, lineups: Sequence[LineupPlayer]) -> None:
         self.session.query(LineupModel).filter(LineupModel.match_id == match_id).delete()
-        for lineup in lineups:
-            self._upsert_team(lineup.team_id, lineup.team_id)
+        teams = {lineup.team_id for lineup in lineups}
+        players = {lineup.player_id: lineup for lineup in lineups}
+        for team_id in teams:
+            self._upsert_team(team_id, team_id)
+        for lineup in players.values():
             self._upsert_player(lineup.player_id, lineup.player_name, lineup.position)
+        self.session.flush()
+
+        for lineup in lineups:
             self.session.add(
                 LineupModel(
                     id=lineup.id,
@@ -153,12 +167,22 @@ class MatchIngestionService:
 
     def _replace_match_events(self, match_id: str, events: Sequence[MatchEvent]) -> None:
         self.session.query(MatchEventModel).filter(MatchEventModel.match_id == match_id).delete()
+        players = {
+            event.player_id: event.provider_payload.get("player")
+            for event in events
+            if event.player_id is not None
+        }
+        teams = {
+            event.team_id: event.provider_payload.get("team")
+            for event in events
+        }
+        for player_id, raw_player in players.items():
+            self._ensure_event_player(player_id, raw_player)
+        for team_id, raw_team in teams.items():
+            self._upsert_team(team_id, _provider_name(raw_team) or team_id)
+        self.session.flush()
+
         for event in events:
-            self._ensure_event_player(event.player_id, event.provider_payload.get("player"))
-            self._upsert_team(
-                event.team_id,
-                _provider_name(event.provider_payload.get("team")) or event.team_id,
-            )
             self.session.add(
                 MatchEventModel(
                     id=f"{match_id}:event:{event.id}",

@@ -23,7 +23,11 @@ def normalize_statsbomb_match(raw: dict[str, Any]) -> Match:
         provider="statsbomb_open",
         provider_match_id=str(raw["match_id"]),
         competition_id=competition_id,
+        competition_name=raw["competition"].get("competition_name"),
+        competition_country=raw["competition"].get("country_name"),
+        competition_gender=raw.get("competition_gender"),
         season_id=season_id,
+        season_name=raw["season"].get("season_name"),
         home_team=TeamRef(
             id=f"statsbomb:{raw['home_team']['home_team_id']}",
             name=raw["home_team"]["home_team_name"],
@@ -138,8 +142,13 @@ def _parse_datetime(match_date: str | None, kick_off: str | None) -> datetime | 
     return datetime.fromisoformat(f"{match_date}T{time_value}").replace(tzinfo=UTC)
 
 
-def _name(value: dict[str, Any] | None) -> str | None:
-    return value.get("name") if value else None
+def _name(value: Any) -> str | None:
+    if isinstance(value, str):
+        return value
+    if isinstance(value, dict):
+        name = value.get("name")
+        return str(name) if name is not None else None
+    return None
 
 
 def _as_str(value: Any) -> str | None:

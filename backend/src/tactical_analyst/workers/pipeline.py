@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from tactical_analyst.analytics.registry import calculate_all_metrics
 from tactical_analyst.analytics.service import persist_metric_results
 from tactical_analyst.config.settings import Settings, get_settings
-from tactical_analyst.db.models import MatchModel
+from tactical_analyst.db.models import MatchModel, TeamModel
 from tactical_analyst.db.repositories.context import load_match_context
 from tactical_analyst.db.repositories.read import find_existing_report, list_metrics
 from tactical_analyst.db.repositories.write import persist_tactical_report
@@ -222,10 +222,14 @@ def _match_metadata(session: Session, match_id: str) -> dict[str, Any]:
     match = session.get(MatchModel, match_id)
     if match is None:
         return {"match_id": match_id}
+    home_team = session.get(TeamModel, match.home_team_id)
+    away_team = session.get(TeamModel, match.away_team_id)
     return {
         "match_id": match.id,
-        "home_team_id": match.home_team_id,
-        "away_team_id": match.away_team_id,
+        "home_team": {"id": match.home_team_id, "name": home_team.name if home_team else None},
+        "away_team": {"id": match.away_team_id, "name": away_team.name if away_team else None},
+        "home_score": match.home_score,
+        "away_score": match.away_score,
         "score": f"{match.home_score}-{match.away_score}",
         "kickoff_at": match.kickoff_at.isoformat() if match.kickoff_at else None,
     }

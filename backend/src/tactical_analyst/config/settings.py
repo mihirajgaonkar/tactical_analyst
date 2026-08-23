@@ -29,7 +29,7 @@ class Settings(BaseSettings):
 
     llm_provider: str = "gemini"
     google_api_key: str | None = None
-    gemini_model: str = "gemini-2.5-flash"
+    gemini_model: str = "gemini-3.6-flash"
     llm_temperature: float = 0.1
     llm_max_retries: int = 3
     llm_timeout_seconds: int = 60

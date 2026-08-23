@@ -4,8 +4,14 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from tactical_analyst.api.dependencies import get_job_client
-from tactical_analyst.api.serializers import match_to_dict
-from tactical_analyst.db.repositories.read import get_match, get_team, list_matches
+from tactical_analyst.api.serializers import claim_to_dict, match_to_dict, report_to_dict
+from tactical_analyst.db.repositories.read import (
+    get_latest_report_for_match,
+    get_match,
+    get_team,
+    list_matches,
+    list_report_claims,
+)
 from tactical_analyst.db.session import get_db_session
 from tactical_analyst.workers.jobs import JobClient
 
@@ -50,6 +56,20 @@ def analyze_match(match_id: str, job_client: JobDependency) -> dict:
         idempotency_key=f"analysis:{match_id}",
     )
     return {"job_id": job.job_id, "status": job.status}
+
+
+@router.get("/{match_id}/report")
+def get_latest_match_report(match_id: str, session: DbSession) -> dict:
+    if get_match(session, match_id) is None:
+        raise HTTPException(status_code=404, detail="Match not found")
+    report = get_latest_report_for_match(session, match_id)
+    if report is None:
+        raise HTTPException(status_code=404, detail="Report not found")
+    response = report_to_dict(report)
+    response["claims"] = [
+        claim_to_dict(claim) for claim in list_report_claims(session, report.id)
+    ]
+    return response
 
 
 def _match_response(session: Session, match) -> dict:

@@ -80,6 +80,19 @@ def find_existing_report(
     return session.scalar(statement)
 
 
+def get_latest_report_for_match(
+    session: Session,
+    match_id: str,
+) -> TacticalReportModel | None:
+    statement = (
+        select(TacticalReportModel)
+        .where(TacticalReportModel.match_id == match_id)
+        .order_by(TacticalReportModel.created_at.desc(), TacticalReportModel.id.desc())
+        .limit(1)
+    )
+    return session.scalar(statement)
+
+
 def list_report_claims(session: Session, report_id: str) -> list[ReportClaimModel]:
     statement = select(ReportClaimModel).where(ReportClaimModel.report_id == report_id)
     return list(session.scalars(statement).all())

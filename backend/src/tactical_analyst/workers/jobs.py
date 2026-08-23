@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Any, Protocol
 from uuid import uuid4
 
 
@@ -53,12 +53,22 @@ class CeleryJobClient:
         self.celery_app = celery_app
 
     def enqueue(self, task_name: str, *args, **kwargs) -> QueuedJob:
-        idempotency_key = kwargs.pop("idempotency_key", None)
-        if idempotency_key:
-            kwargs["idempotency_key"] = idempotency_key
+        # Idempotency metadata belongs to the queue client, not the task signature.
+        # Passing it as a task kwarg makes Celery reject tasks that only accept match_id.
+        kwargs.pop("idempotency_key", None)
         result = self.celery_app.send_task(task_name, args=args, kwargs=kwargs)
         return QueuedJob(job_id=result.id, status="queued")
 
     def status(self, job_id: str) -> dict:
         result = self.celery_app.AsyncResult(job_id)
-        return {"job_id": job_id, "status": result.status.lower(), "result": result.result}
+        return {
+            "job_id": job_id,
+            "status": result.status.lower(),
+            "result": _json_safe_result(result.result),
+        }
+
+
+def _json_safe_result(value: Any) -> Any:
+    if value is None or isinstance(value, (str, int, float, bool, list, dict)):
+        return value
+    return str(value)

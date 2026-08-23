@@ -73,4 +73,11 @@ export type TacticalReport = {
 export type JobResponse = {
   job_id: string;
   status: string;
+  result?: {
+    status?: string;
+    match_id?: string;
+    report_id?: string;
+    errors?: string[];
+    [key: string]: unknown;
+  } | string | null;
 };

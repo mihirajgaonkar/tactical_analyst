@@ -1,8 +1,36 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { App } from "./App";
+
+vi.mock("./api/client", async () => {
+  const demo = await import("./api/demoData");
+  return {
+    fetchCompetitions: () => Promise.resolve(demo.demoCompetitions),
+    fetchSeasons: (competitionId: string | null) =>
+      Promise.resolve(competitionId ? demo.demoSeasons[competitionId] ?? [] : []),
+    fetchMatches: (competitionId: string | null, seasonId: string | null) =>
+      Promise.resolve(
+        demo.demoMatches.filter(
+          (match) =>
+            match.competition_id === competitionId && match.season_id === seasonId
+        )
+      ),
+    fetchMetrics: (matchId: string | null) =>
+      Promise.resolve(matchId ? demo.demoMetrics[matchId] ?? [] : []),
+    fetchReport: (matchId: string | null) =>
+      Promise.resolve(matchId ? demo.demoReports[matchId] ?? null : null),
+    fetchEvidence: (_reportId: string | null, matchId: string | null) =>
+      Promise.resolve(matchId ? demo.demoEvidence[matchId] ?? [] : []),
+    analyzeMatch: (matchId: string) =>
+      Promise.resolve({ job_id: `demo-${matchId}`, status: "queued" }),
+    waitForJob: (jobId: string) =>
+      Promise.resolve({ job_id: jobId, status: "success", result: { status: "completed" } }),
+    ingestMatch: vi.fn(),
+    fetchMatch: vi.fn()
+  };
+});
 
 function renderApp() {
   const client = new QueryClient({
@@ -31,7 +59,7 @@ describe("App", () => {
     expect(screen.getAllByTestId("plotly-chart").length).toBeGreaterThan(0);
 
     await user.click(screen.getByRole("button", { name: /Analyze Match/i }));
-    await waitFor(() => expect(screen.getByText(/Analysis queued/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/Analysis complete/i)).toBeInTheDocument());
 
     expect(screen.getByText(/Home FC created the stronger chance profile/i)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /territory/i }));
